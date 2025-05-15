@@ -12,14 +12,22 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import JSONResponse
 from bson import ObjectId
 from pydantic import BaseModel
-from app.database import collection
+from database import collection
 
-router = APIRouter()
+app = FastAPI()
+
+# Mount static folder (สำคัญมากเพื่อให้รูปโหลดได้)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Template path
+project_root = os.path.abspath(os.path.dirname(__file__))
+template_path = os.path.join(project_root, "template")
+templates = Jinja2Templates(directory=template_path)
 
 # -- เก็บการเชื่อมต่อ WebSocket
 active_connections = []
 
-@router.websocket("/ws/alerts")
+@app.websocket("/ws/alerts")
 async def websocket_alerts(websocket: WebSocket):
     await websocket.accept()
     active_connections.append(websocket)
@@ -48,45 +56,7 @@ class SOSPayload(BaseModel):
     image_url: str = None
     latitude: float = None
     longitude: float = None
-    source: str = "user"
-
-@router.post("/api/sos")
-async def receive_sos(payload: SOSPayload):
-    data = payload.dict()
-    try:
-        result = await collection.insert_one(data)
-        return {"status": "received", "id": str(result.inserted_id)}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-@router.get("/api/sos")
-async def get_sos_all():
-    sos_list = []
-    async for doc in collection.find().sort("timestamp", -1):
-        doc["_id"] = str(doc["_id"])
-        sos_list.append(doc)
-    return sos_list
-
-@router.delete("/api/sos/{id}")
-async def delete_sos(id: str):
-    try:
-        result = await collection.delete_one({"_id": ObjectId(id)})
-        if result.deleted_count:
-            return {"status": "deleted"}
-        return JSONResponse(status_code=404, content={"status": "not found"})
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-app = FastAPI()
-
-# Mount static folder (สำคัญมากเพื่อให้รูปโหลดได้)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Template path
-project_root = os.path.abspath(os.path.dirname(__file__))
-template_path = os.path.join(project_root, "template")
-templates = Jinja2Templates(directory=template_path)
-
+    
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     try:
@@ -113,7 +83,7 @@ async def read_root(request: Request):
             "path": url_path
         }
 
-        return templates.TemplateResponse("index.html", {"request": request, "data": data})
+        return templates.TemplateResponse("history.html", {"request": request, "data": data})
 
     except Exception as e:
         print("🔥 ERROR OCCURRED 🔥")
@@ -121,3 +91,32 @@ async def read_root(request: Request):
         return HTMLResponse(
             content=f"<h1>❌ Internal Server Error</h1><pre>{e}</pre>", status_code=500
         )
+
+@app.post("/api/sos")
+async def receive_sos(payload: SOSPayload):
+    data = payload.dict()
+    try:
+        result = await collection.insert_one(data)
+        return {"status": "received", "id": str(result.inserted_id)}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.get("/api/sos")
+async def get_sos_all():
+    sos_list = []
+    async for doc in collection.find().sort("timestamp", -1):
+        doc["_id"] = str(doc["_id"])
+        sos_list.append(doc)
+    return sos_list
+
+@app.delete("/api/sos/{id}")
+async def delete_sos(id: str):
+    try:
+        result = await collection.delete_one({"_id": ObjectId(id)})
+        if result.deleted_count:
+            return {"status": "deleted"}
+        return JSONResponse(status_code=404, content={"status": "not found"})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
