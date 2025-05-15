@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>template</title>
+</head>
+<body>
+    <h1 style="color: red;">SOS handsignals</h1>
+    <p>Name : {{data.name}}</p>
+    <p>Date : {{data.date}}</p>
+    <p>Time : {{data.time}}</p>
+    <p>location : {{data.location}}</p>
+    <img src="{{ data.path }}?v={{ data.time }}" alt="Detected image">
+    <p>data path : {{data.path}}</p>
+</body>
+</html>
